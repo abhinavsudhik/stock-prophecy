@@ -33,7 +33,6 @@ export const Sidebar = () => {
                 : "text-muted-foreground hover:text-foreground hover:bg-muted"
             )}
           >
-            <item.icon className="w-5 h-5" />
             <span className="font-medium">{item.name}</span>
           </button>
         ))}
