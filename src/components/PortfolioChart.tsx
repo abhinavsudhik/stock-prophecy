@@ -49,23 +49,91 @@ export const PortfolioChart = () => {
         </div>
       </div>
       
-      <div className="h-64 flex items-end justify-between space-x-2 mb-4">
-        {chartData.map((data, index) => (
-          <div key={data.date} className="flex-1 flex flex-col items-center">
-            <div
-              className="w-full bg-gradient-chart rounded-t-lg relative transition-smooth hover:opacity-80"
-              style={{
-                height: `${(data.value / maxValue) * 200}px`,
-              }}
-            >
-              {index === 6 && (
-                <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium">
-                  $440
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
+      <div className="h-64 relative mb-4">
+        <svg className="w-full h-full" viewBox="0 0 400 200">
+          {/* Grid lines */}
+          <defs>
+            <pattern id="grid" width="40" height="20" patternUnits="userSpaceOnUse">
+              <path d="M 40 0 L 0 0 0 20" fill="none" stroke="hsl(var(--border))" strokeWidth="0.5" opacity="0.3"/>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#grid)" />
+          
+          {/* Line graph */}
+          <defs>
+            <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="hsl(var(--primary))" />
+              <stop offset="100%" stopColor="hsl(var(--accent))" />
+            </linearGradient>
+            <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.3" />
+              <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.05" />
+            </linearGradient>
+          </defs>
+          
+          {/* Create path for line */}
+          <path
+            d={`M ${chartData.map((data, index) => {
+              const x = (index / (chartData.length - 1)) * 350 + 25;
+              const y = 180 - ((data.value / maxValue) * 140);
+              return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
+            }).join(' ')}`}
+            fill="none"
+            stroke="url(#lineGradient)"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          
+          {/* Area under the line */}
+          <path
+            d={`M ${chartData.map((data, index) => {
+              const x = (index / (chartData.length - 1)) * 350 + 25;
+              const y = 180 - ((data.value / maxValue) * 140);
+              return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
+            }).join(' ')} L ${25 + 350} 180 L 25 180 Z`}
+            fill="url(#areaGradient)"
+          />
+          
+          {/* Data points */}
+          {chartData.map((data, index) => {
+            const x = (index / (chartData.length - 1)) * 350 + 25;
+            const y = 180 - ((data.value / maxValue) * 140);
+            return (
+              <g key={data.date}>
+                <circle
+                  cx={x}
+                  cy={y}
+                  r="4"
+                  fill="hsl(var(--primary))"
+                  stroke="hsl(var(--background))"
+                  strokeWidth="2"
+                  className="hover:r-6 transition-all cursor-pointer"
+                />
+                {index === 6 && (
+                  <g>
+                    <rect
+                      x={x - 18}
+                      y={y - 25}
+                      width="36"
+                      height="20"
+                      rx="4"
+                      fill="hsl(var(--primary))"
+                    />
+                    <text
+                      x={x}
+                      y={y - 12}
+                      textAnchor="middle"
+                      className="text-xs font-medium fill-primary-foreground"
+                    >
+                      $440
+                    </text>
+                  </g>
+                )}
+              </g>
+            );
+          })}
+        </svg>
       </div>
       
       <div className="flex justify-between text-xs text-muted-foreground">
