@@ -1,4 +1,4 @@
-import { LayoutGrid, TrendingUp, CreditCard, Layers, Settings, User, LogOut } from "lucide-react";
+import { LayoutGrid, TrendingUp, CreditCard, Layers, Settings, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
@@ -38,13 +38,6 @@ export const Sidebar = () => {
           </button>
         ))}
       </nav>
-      
-      <div className="absolute bottom-6 left-4 right-4">
-        <button className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-smooth">
-          <LogOut className="w-5 h-5" />
-          <span className="font-medium">Log Out</span>
-        </button>
-      </div>
     </div>
   );
 };
