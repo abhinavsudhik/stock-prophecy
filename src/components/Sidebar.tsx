@@ -36,10 +36,23 @@ export const Sidebar = () => {
     <div className="fixed left-0 top-0 h-full w-64 bg-card/50 backdrop-blur-xl border-r border-border">
       <div className="p-6">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-gradient-crypto rounded-lg flex items-center justify-center">
-            <div className="w-4 h-4 bg-foreground rounded-full"></div>
+          <img 
+            src="/logo.png" 
+            alt="Stock Prophecy Logo" 
+            className="w-8 h-8 object-contain"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+              const fallback = target.nextElementSibling as HTMLElement;
+              if (fallback && fallback.classList.contains('logo-fallback')) {
+                fallback.style.display = 'flex';
+              }
+            }}
+          />
+          <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-600 rounded-lg flex items-center justify-center logo-fallback" style={{display: 'none'}}>
+            <span className="text-white font-bold text-sm">SP</span>
           </div>
-          <span className="text-xl font-bold text-foreground">Cryptory</span>
+          <span className="text-xl font-bold text-foreground">Stock Prophecy</span>
         </div>
       </div>
       <div className="px-4 mb-6">

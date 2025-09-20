@@ -1,6 +1,11 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const API_KEY = "AIzaSyBDdH33VrTnBVkq-v2_MNycCm7cuACvxY8";
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+
+if (!API_KEY) {
+  throw new Error("VITE_GEMINI_API_KEY environment variable is not set. Please add your Gemini API key to the .env file.");
+}
+
 const genAI = new GoogleGenerativeAI(API_KEY);
 
 // Helper function to extract JSON from potentially markdown-wrapped responses
