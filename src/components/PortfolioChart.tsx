@@ -1,148 +1,269 @@
-import { TrendingUp, BarChart3 } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "./ui/chart";
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
+import { Button } from "./ui/button";
+import { TrendingUp, Loader2 } from "lucide-react";
+import { generateStockPrediction, type PredictionData, type StockDataPoint } from "../services/geminiService";
 
-const chartData = [
-  { date: "17 Mar", value: 380 },
-  { date: "18 Mar", value: 520 },
-  { date: "19 Mar", value: 480 },
-  { date: "20 Mar", value: 460 },
-  { date: "21 Mar", value: 420 },
-  { date: "22 Mar", value: 490 },
-  { date: "23 Mar", value: 380 },
-  { date: "24 Mar", value: 340 },
-  { date: "25 Mar", value: 280 },
-  { date: "26 Mar", value: 240 },
-];
+export const PortfolioChart: React.FC<{ 
+  selectedStock: string | null, 
+  onDailyChange?: (change: number | null) => void,
+  onPredictionChange?: (data: PredictionData[] | null) => void 
+}> = ({ selectedStock, onDailyChange, onPredictionChange }) => {
+  // Determine line color based on trend
+  const [period, setPeriod] = useState<string>("1M");
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [predictions, setPredictions] = useState<PredictionData[]>([]);
+  const [loadingPredictions, setLoadingPredictions] = useState(false);
+  const [showPredictions, setShowPredictions] = useState(false);
+  const [combinedData, setCombinedData] = useState<any[]>([]);
+  const getLineColor = () => {
+    if (!chartData || chartData.length < 2) return '#ec4899';
+    const first = chartData[0]?.close;
+    const last = chartData[chartData.length - 1]?.close;
+    if (typeof first !== 'number' || typeof last !== 'number') return '#ec4899';
+    if (last > first) return '#22c55e';
+    if (last < first) return '#ef4444';
+    return '#ec4899';
+  }
 
-const timeframes = ["1H", "1D", "3D", "1M", "1Y"];
+  const generatePredictions = async () => {
+    if (!selectedStock || !chartData.length) return;
+    
+    setLoadingPredictions(true);
+    try {
+      const stockData: StockDataPoint[] = chartData.map(item => ({
+        date: item.date,
+        close: item.close,
+        high: item.high,
+        low: item.low,
+        open: item.open,
+        volume: item.volume
+      }));
+      
+      const predictionData = await generateStockPrediction(selectedStock, stockData);
+      setPredictions(predictionData);
+      setShowPredictions(true);
+      
+      // Pass all prediction data to parent
+      if (onPredictionChange) {
+        onPredictionChange(predictionData);
+      }
+    } catch (error) {
+      console.error("Failed to generate predictions:", error);
+      if (onPredictionChange) {
+        onPredictionChange(null);
+      }
+    } finally {
+      setLoadingPredictions(false);
+    }
+  };
 
-export const PortfolioChart = () => {
-  const maxValue = Math.max(...chartData.map(d => d.value));
-  
+  // Combine historical data with predictions for chart display
+  useEffect(() => {
+    let combined = [...chartData];
+    
+    if (showPredictions && predictions.length > 0 && chartData.length > 0) {
+      // Get the last historical data point to connect predictions
+      const lastHistoricalPoint = chartData[chartData.length - 1];
+      
+      // Add a connecting point (duplicate last historical point but marked as prediction start)
+      const connectingPoint = {
+        date: lastHistoricalPoint.date,
+        close: lastHistoricalPoint.close,
+        isPrediction: true,
+        isConnector: true,
+        confidence: 1
+      };
+      
+      // Create prediction data points
+      const predictionChartData = predictions.map(pred => ({
+        date: pred.date,
+        close: pred.predictedClose,
+        isPrediction: true,
+        confidence: pred.confidence
+      }));
+      
+      // Combine: historical + connecting point + predictions
+      combined = [...chartData, connectingPoint, ...predictionChartData];
+    }
+    
+    setCombinedData(combined);
+  }, [chartData, predictions, showPredictions]);
+
+  useEffect(() => {
+    if (!selectedStock) return;
+    setLoading(true);
+    setShowPredictions(false);
+    setPredictions([]);
+    
+    // Reset prediction data when stock changes
+    if (onPredictionChange) {
+      onPredictionChange(null);
+    }
+    
+    fetch(`http://localhost:4000/api/stock-data?symbol=${selectedStock}&period=${period}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setChartData(data);
+        setLoading(false);
+        // Calculate daily change for 1D period
+        if (onDailyChange) {
+          let change: number | null = null;
+          if (period === '1D' && data.length >= 2) {
+            const prev = data[0].close;
+            const curr = data[data.length - 1].close;
+            change = ((curr - prev) / prev) * 100;
+          } else if (data.length >= 2) {
+            // For other periods, show last day's change
+            const prev = data[data.length - 2].close;
+            const curr = data[data.length - 1].close;
+            change = ((curr - prev) / prev) * 100;
+          }
+          onDailyChange(change);
+        }
+      })
+      .catch(() => {
+        setChartData([]);
+        setLoading(false);
+        if (onDailyChange) onDailyChange(null);
+      });
+  }, [selectedStock, period, onDailyChange]);
+
   return (
-    <div className="bg-card/80 backdrop-blur-sm rounded-2xl p-6 border border-border">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-3">
-          <h3 className="text-xl font-bold text-foreground">Portfolios performance</h3>
-          <div className="flex items-center space-x-2 bg-muted rounded-lg p-1">
-            <div className="w-6 h-6 bg-crypto-ethereum rounded-full"></div>
-            <span className="text-sm font-medium text-foreground">ETH</span>
-            <TrendingUp className="w-4 h-4 text-muted-foreground" />
+    <Card>
+      <CardHeader>
+        <div className="flex justify-between items-start">
+          <div>
+            <CardTitle>Stock Chart</CardTitle>
+            {showPredictions && predictions.length > 0 && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Showing 7-day AI predictions powered by Gemini
+              </p>
+            )}
           </div>
-        </div>
-        
-        <div className="flex items-center space-x-2">
-          {timeframes.map((timeframe) => (
-            <button
-              key={timeframe}
-              className={`px-3 py-1 rounded-lg text-sm font-medium transition-smooth ${
-                timeframe === "3D"
-                  ? "bg-gradient-crypto text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
+          {selectedStock && chartData.length > 0 && (
+            <Button
+              onClick={generatePredictions}
+              disabled={loadingPredictions}
+              variant="outline"
+              size="sm"
+              className="ml-4"
             >
-              {timeframe}
+              {loadingPredictions ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <TrendingUp className="h-4 w-4 mr-2" />
+                  Predict Next 7 Days
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <span className="font-medium mr-2">Time Period:</span>
+          {['1D', '1W', '1M', '3M', '6M', '1Y'].map(p => (
+            <button
+              key={p}
+              className={`px-3 py-1 rounded-full mx-1 ${period === p ? 'bg-primary text-white' : 'bg-muted text-foreground'}`}
+              onClick={() => setPeriod(p)}
+            >
+              {p}
             </button>
           ))}
-          <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-smooth">
-            <BarChart3 className="w-4 h-4" />
-          </button>
         </div>
-      </div>
-      
-      <div className="h-64 relative mb-4">
-        <svg className="w-full h-full" viewBox="0 0 400 200">
-          {/* Grid lines */}
-          <defs>
-            <pattern id="grid" width="40" height="20" patternUnits="userSpaceOnUse">
-              <path d="M 40 0 L 0 0 0 20" fill="none" stroke="hsl(var(--border))" strokeWidth="0.5" opacity="0.3"/>
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#grid)" />
-          
-          {/* Line graph */}
-          <defs>
-            <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="hsl(var(--primary))" />
-              <stop offset="100%" stopColor="hsl(var(--accent))" />
-            </linearGradient>
-            <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.3" />
-              <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.05" />
-            </linearGradient>
-          </defs>
-          
-          {/* Create path for line */}
-          <path
-            d={`M ${chartData.map((data, index) => {
-              const x = (index / (chartData.length - 1)) * 350 + 25;
-              const y = 180 - ((data.value / maxValue) * 140);
-              return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
-            }).join(' ')}`}
-            fill="none"
-            stroke="url(#lineGradient)"
-            strokeWidth="3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          
-          {/* Area under the line */}
-          <path
-            d={`M ${chartData.map((data, index) => {
-              const x = (index / (chartData.length - 1)) * 350 + 25;
-              const y = 180 - ((data.value / maxValue) * 140);
-              return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
-            }).join(' ')} L ${25 + 350} 180 L 25 180 Z`}
-            fill="url(#areaGradient)"
-          />
-          
-          {/* Data points */}
-          {chartData.map((data, index) => {
-            const x = (index / (chartData.length - 1)) * 350 + 25;
-            const y = 180 - ((data.value / maxValue) * 140);
-            return (
-              <g key={data.date}>
-                <circle
-                  cx={x}
-                  cy={y}
-                  r="4"
-                  fill="hsl(var(--primary))"
-                  stroke="hsl(var(--background))"
-                  strokeWidth="2"
-                  className="hover:r-6 transition-all cursor-pointer"
+      </CardHeader>
+      <CardContent>
+        {!selectedStock ? (
+          <div className="text-center py-8 text-muted-foreground">Select a stock from the sidebar.</div>
+        ) : loading ? (
+          <div className="text-center py-8">Loading...</div>
+        ) : chartData.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">No data found for this stock.</div>
+        ) : (
+          <div>
+            <ChartContainer config={{}}>
+              <LineChart
+                width={700}
+                height={300}
+                data={combinedData}
+                margin={{
+                  top: 24,
+                  left: 24,
+                  right: 24,
+                }}
+              >
+                <CartesianGrid vertical={false} />
+                <YAxis />
+                <ChartTooltip
+                  cursor={false}
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-background border rounded-lg shadow-lg p-3">
+                          <p className="font-medium">{new Date(label).toLocaleDateString()}</p>
+                          <p className="text-sm">
+                            {data.isPrediction && !data.isConnector ? 'Predicted' : 'Actual'} Price: ${typeof payload[0].value === 'number' ? payload[0].value.toFixed(2) : payload[0].value}
+                          </p>
+                          {data.isPrediction && !data.isConnector && data.confidence && (
+                            <p className="text-xs text-muted-foreground">
+                              Confidence: {(data.confidence * 100).toFixed(0)}%
+                            </p>
+                          )}
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
                 />
-                {index === 6 && (
-                  <g>
-                    <rect
-                      x={x - 18}
-                      y={y - 25}
-                      width="36"
-                      height="20"
-                      rx="4"
-                      fill="hsl(var(--primary))"
-                    />
-                    <text
-                      x={x}
-                      y={y - 12}
-                      textAnchor="middle"
-                      className="text-xs font-medium fill-primary-foreground"
-                    >
-                      $440
-                    </text>
-                  </g>
-                )}
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-      
-      <div className="flex justify-between text-xs text-muted-foreground">
-        {chartData.map((data, index) => (
-          <span key={data.date} className={index % 2 === 0 ? '' : 'opacity-60'}>
-            {data.date}
-          </span>
-        ))}
-      </div>
-    </div>
+                {/* Single continuous line for all data */}
+                <Line
+                  dataKey="close"
+                  type="natural"
+                  stroke={getLineColor()}
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 6 }}
+                  connectNulls={true}
+                  data={combinedData}
+                />
+                <XAxis dataKey="date" tickFormatter={date => new Date(date).toLocaleDateString()} />
+              </LineChart>
+            </ChartContainer>
+            {showPredictions && predictions.length > 0 && (
+              <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                <div className="flex items-center mb-2">
+                  <TrendingUp className="h-4 w-4 mr-2 text-yellow-600" />
+                  <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                    AI-Generated Predictions
+                  </span>
+                </div>
+                <p className="text-xs text-yellow-700 dark:text-yellow-300 mb-2">
+                  The dashed yellow line shows 7-day price predictions generated by Gemini AI based on historical data and market patterns.
+                </p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="font-medium">Next Day Prediction:</span> ${predictions[0]?.predictedClose.toFixed(2)}
+                  </div>
+                  <div>
+                    <span className="font-medium">7-Day Range:</span> ${Math.min(...predictions.map(p => p.predictedClose)).toFixed(2)} - ${Math.max(...predictions.map(p => p.predictedClose)).toFixed(2)}
+                  </div>
+                </div>
+                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2 italic">
+                  ⚠️ Predictions are for educational purposes only and should not be used as financial advice.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
-};
+}

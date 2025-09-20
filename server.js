@@ -1,0 +1,78 @@
+import express from 'express';
+import yahooFinance from 'yahoo-finance2';
+import cors from 'cors';
+
+const app = express();
+app.use(cors());
+const PORT = 4000;
+
+// S&P 500 symbols list (static for demo, can be replaced with dynamic fetch)
+const sp500Symbols = [
+  'AAPL', 'MSFT', 'AMZN', 'GOOGL', 'META', 'NVDA', 'TSLA', 'BRK-B', 'JPM', 'JNJ'
+];
+
+app.get('/api/stocks', async (req, res) => {
+  try {
+    // Fetch quote summary for each symbol
+    const promises = sp500Symbols.map(symbol => yahooFinance.quoteSummary(symbol, { modules: ['price'] }));
+    const results = await Promise.all(promises);
+    const stocks = results.map(r => `${r.price.longName} (${r.price.symbol})`);
+    res.json(stocks);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch stocks', details: err.message });
+  }
+});
+
+// New endpoint: get historical price data for a stock symbol
+app.get('/api/stock-data', async (req, res) => {
+  const symbol = req.query.symbol;
+  const period = req.query.period || '6M';
+  if (!symbol) return res.status(400).json({ error: 'Missing symbol' });
+  try {
+    const now = new Date();
+    let period1 = new Date(now);
+    let interval = '1d';
+    switch (period) {
+      case '1D':
+        period1.setDate(now.getDate() - 2); // fetch last two days
+        interval = '1d';
+        break;
+      case '1W':
+        period1.setDate(now.getDate() - 7);
+        interval = '1d';
+        break;
+      case '1M':
+        period1.setMonth(now.getMonth() - 1);
+        interval = '1d';
+        break;
+      case '3M':
+        period1.setMonth(now.getMonth() - 3);
+        interval = '1d';
+        break;
+      case '6M':
+        period1.setMonth(now.getMonth() - 6);
+        interval = '1d';
+        break;
+      case '1Y':
+        period1.setFullYear(now.getFullYear() - 1);
+        interval = '1d';
+        break;
+      default:
+        period1.setMonth(now.getMonth() - 6);
+        interval = '1d';
+    }
+    const results = await yahooFinance.historical(symbol, {
+      period1,
+      period2: now,
+      interval,
+    });
+    const chartData = results.map(d => ({ date: d.date, close: d.close }));
+    res.json(chartData);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch stock data', details: err.message });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
