@@ -1,6 +1,12 @@
 {
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
   "functions": {
     "api/stocks.js": {
+      "maxDuration": 10
+    },
+    "api/stock-data.js": {
       "maxDuration": 10
     }
   },
@@ -8,6 +14,16 @@
     {
       "source": "/api/(.*)",
       "destination": "/api/$1"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }

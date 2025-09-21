@@ -61,12 +61,22 @@ app.get('/api/stock-data', async (req, res) => {
         period1.setMonth(now.getMonth() - 6);
         interval = '1d';
     }
-    const results = await yahooFinance.historical(symbol, {
+    const results = await yahooFinance.chart(symbol, {
       period1,
       period2: now,
       interval,
     });
-    const chartData = results.map(d => ({ date: d.date, close: d.close }));
+    
+    // Extract the quote data from the chart results
+    const quotes = results.quotes || [];
+    const chartData = quotes.map(d => ({ 
+      date: d.date, 
+      close: d.close,
+      open: d.open,
+      high: d.high,
+      low: d.low,
+      volume: d.volume
+    }));
     res.json(chartData);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch stock data', details: err.message });

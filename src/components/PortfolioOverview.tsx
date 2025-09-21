@@ -143,7 +143,7 @@ export function PortfolioOverview({
 			setLoading(true);
 			try {
 				// Fetch recent data for calculations
-				const response = await fetch(`http://localhost:4000/api/stock-data?symbol=${selectedStock}&period=3M`);
+								const response = await fetch(`/api/stock-data?symbol=${selectedStock}&period=3M`);
 				const data = await response.json();
 				
 				if (data && data.length > 0) {
