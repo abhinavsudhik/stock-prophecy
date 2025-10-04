@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Search, X } from 'lucide-react';
+import { ArrowLeft, Search, X, TrendingUp, Shield, Target } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '../components/ui/chart';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
+import { MarkowitzOptimizer } from '../utils/markowitzOptimizer';
+import { fetchHistoricalData, calculateExpectedReturns, calculateCovarianceMatrix, validateWeights } from '../utils/dataProcessor';
 
 interface Stock {
   symbol: string;
@@ -39,6 +41,10 @@ const PortfolioOptimizer: React.FC = () => {
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
   const [currentInput, setCurrentInput] = useState<string>('');
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
+  const [optimizationMethod, setOptimizationMethod] = useState<'maxSharpe' | 'minVariance' | 'targetReturn'>('maxSharpe');
+  const [targetReturn, setTargetReturn] = useState<number>(0.12); // 12% target return
+  const [isDataLoading, setIsDataLoading] = useState<boolean>(false);
+  const [optimizationError, setOptimizationError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
@@ -183,47 +189,109 @@ const PortfolioOptimizer: React.FC = () => {
     }
   };
 
-  // Simulated Markowitz optimization (in real app, this would call your backend)
+  // Real Markowitz Mean-Variance Optimization
   const optimizePortfolio = async (symbols: string[]) => {
     setIsOptimizing(true);
+    setIsDataLoading(true);
+    setOptimizationError(null);
     
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Mock optimization results (in real implementation, use actual historical data and optimization algorithm)
-    const mockResults: Stock[] = symbols.map((symbol, index) => {
-      const weights = [0.45, 0.35, 0.20]; // Example optimal weights
-      const returns = [0.185, 0.165, 0.220]; // Mock expected returns
+    try {
+      console.log('Starting portfolio optimization for symbols:', symbols);
       
-      return {
+      // Step 1: Fetch historical data
+      const historicalData = await fetchHistoricalData(symbols, '1Y');
+      console.log('Historical data fetched:', Object.keys(historicalData));
+      setIsDataLoading(false);
+      
+      // Step 2: Calculate expected returns and covariance matrix
+      const expectedReturns = calculateExpectedReturns(historicalData);
+      const covarianceMatrix = calculateCovarianceMatrix(historicalData);
+      
+      console.log('Expected returns:', expectedReturns);
+      console.log('Covariance matrix dimensions:', covarianceMatrix.length, 'x', covarianceMatrix[0]?.length);
+      
+      // Step 3: Initialize Markowitz optimizer
+      const optimizer = new MarkowitzOptimizer(0.02); // 2% risk-free rate
+      
+      // Step 4: Optimize based on selected method
+      let result;
+      switch (optimizationMethod) {
+        case 'maxSharpe':
+          result = optimizer.optimizeMaxSharpe({
+            symbols,
+            expectedReturns,
+            covarianceMatrix
+          });
+          break;
+        case 'minVariance':
+          result = optimizer.optimizeMinVariance({
+            symbols,
+            expectedReturns,
+            covarianceMatrix
+          });
+          break;
+        case 'targetReturn':
+          result = optimizer.optimizeForTargetReturn({
+            symbols,
+            expectedReturns,
+            covarianceMatrix
+          }, targetReturn);
+          break;
+        default:
+          throw new Error('Invalid optimization method');
+      }
+      
+      console.log('Optimization result:', result);
+      
+      // Validate weights
+      if (!validateWeights(result.weights)) {
+        console.warn('Invalid weights detected, normalizing...');
+        const sum = result.weights.reduce((a, b) => a + b, 0);
+        if (sum > 0) {
+          result.weights = result.weights.map(w => Math.max(0, w) / sum);
+        } else {
+          result.weights = new Array(symbols.length).fill(1 / symbols.length);
+        }
+      }
+      
+      // Step 5: Convert to Stock array format
+      const optimizedStocks: Stock[] = symbols.map((symbol, index) => ({
         symbol,
-        weight: weights[index] || 1 / symbols.length,
-        expectedReturn: returns[index] || 0.15
-      };
-    });
-
-    // Normalize weights to sum to 1
-    const totalWeight = mockResults.reduce((sum, stock) => sum + stock.weight, 0);
-    const normalizedResults = mockResults.map(stock => ({
-      ...stock,
-      weight: stock.weight / totalWeight
-    }));
-
-    // Calculate portfolio metrics
-    const portfolioReturn = normalizedResults.reduce(
-      (sum, stock) => sum + (stock.weight * stock.expectedReturn), 0
-    );
-    const portfolioVolatility = 0.123; // Simplified - actual calculation requires covariance matrix
-    const riskFreeRate = 0.02; // Assume 2% risk-free rate
-    const sharpeRatio = (portfolioReturn - riskFreeRate) / portfolioVolatility;
-
-    setOptimizedPortfolio(normalizedResults);
-    setPortfolioMetrics({
-      expectedReturn: portfolioReturn,
-      volatility: portfolioVolatility,
-      sharpeRatio
-    });
-    setIsOptimizing(false);
+        weight: result.weights[index],
+        expectedReturn: expectedReturns[index]
+      }));
+      
+      setOptimizedPortfolio(optimizedStocks);
+      setPortfolioMetrics({
+        expectedReturn: result.expectedReturn,
+        volatility: result.volatility,
+        sharpeRatio: result.sharpeRatio
+      });
+      
+      console.log('Portfolio optimization completed successfully');
+      
+    } catch (error) {
+      console.error('Portfolio optimization failed:', error);
+      setOptimizationError(error instanceof Error ? error.message : 'Optimization failed');
+      
+      // Fallback to equal weights
+      const equalWeight = 1 / symbols.length;
+      const fallbackPortfolio: Stock[] = symbols.map(symbol => ({
+        symbol,
+        weight: equalWeight,
+        expectedReturn: 0.1 // 10% fallback return
+      }));
+      
+      setOptimizedPortfolio(fallbackPortfolio);
+      setPortfolioMetrics({
+        expectedReturn: 0.1,
+        volatility: 0.15,
+        sharpeRatio: 0.53
+      });
+    } finally {
+      setIsOptimizing(false);
+      setIsDataLoading(false);
+    }
   };
 
   const handleOptimize = () => {
@@ -263,6 +331,83 @@ const PortfolioOptimizer: React.FC = () => {
           <div className="flex items-center mb-6">
             <span className="text-3xl mr-3">📈</span>
             <h1 className="text-3xl font-bold text-foreground">Smart Portfolio Optimizer</h1>
+          </div>
+
+          {/* Optimization Method Selector */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-muted-foreground mb-3">
+              Optimization Method
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <button
+                onClick={() => setOptimizationMethod('maxSharpe')}
+                className={`p-4 rounded-lg border transition-smooth text-left ${
+                  optimizationMethod === 'maxSharpe'
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border bg-card/60 text-foreground hover:bg-card'
+                }`}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <TrendingUp className="h-5 w-5" />
+                  <span className="font-semibold">Maximum Sharpe Ratio</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Maximize risk-adjusted returns (return per unit of risk)
+                </p>
+              </button>
+              
+              <button
+                onClick={() => setOptimizationMethod('minVariance')}
+                className={`p-4 rounded-lg border transition-smooth text-left ${
+                  optimizationMethod === 'minVariance'
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border bg-card/60 text-foreground hover:bg-card'
+                }`}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <Shield className="h-5 w-5" />
+                  <span className="font-semibold">Minimum Variance</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Minimize portfolio risk (lowest possible volatility)
+                </p>
+              </button>
+              
+              <button
+                onClick={() => setOptimizationMethod('targetReturn')}
+                className={`p-4 rounded-lg border transition-smooth text-left ${
+                  optimizationMethod === 'targetReturn'
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border bg-card/60 text-foreground hover:bg-card'
+                }`}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <Target className="h-5 w-5" />
+                  <span className="font-semibold">Target Return</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Achieve specific return with minimum risk
+                </p>
+              </button>
+            </div>
+            
+            {/* Target Return Input */}
+            {optimizationMethod === 'targetReturn' && (
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
+                  Target Annual Return (%)
+                </label>
+                <input
+                  type="number"
+                  value={(targetReturn * 100).toFixed(1)}
+                  onChange={(e) => setTargetReturn(parseFloat(e.target.value) / 100)}
+                  min="0"
+                  max="50"
+                  step="0.5"
+                  className="w-32 px-3 py-2 bg-input border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
+                />
+              </div>
+            )}
           </div>
 
           {/* Input Section */}
@@ -323,14 +468,14 @@ const PortfolioOptimizer: React.FC = () => {
                 </div>
                 <button
                   onClick={handleOptimize}
-                  disabled={isOptimizing}
+                  disabled={isOptimizing || isDataLoading}
                   className={`px-8 py-3 rounded-lg font-medium text-lg transition-smooth ${
-                    isOptimizing 
+                    isOptimizing || isDataLoading
                       ? 'bg-muted text-muted-foreground cursor-not-allowed' 
                       : 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-crypto hover:shadow-glow-crypto'
                   }`}
                 >
-                  {isOptimizing ? 'Optimizing...' : 'Optimize Portfolio'}
+                  {isDataLoading ? 'Loading Data...' : isOptimizing ? 'Optimizing...' : 'Optimize Portfolio'}
                 </button>
               </div>
               
@@ -420,8 +565,39 @@ const PortfolioOptimizer: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                <div className="h-80 flex items-center justify-center text-muted-foreground">
-                  {isOptimizing ? 'Calculating optimal allocation...' : 'Enter stocks to optimize'}
+                <div className="h-80 flex flex-col items-center justify-center text-muted-foreground space-y-3">
+                  {isDataLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      <p>Fetching historical data...</p>
+                    </>
+                  ) : isOptimizing ? (
+                    <>
+                      <div className="animate-pulse text-primary">
+                        <TrendingUp className="h-8 w-8" />
+                      </div>
+                      <p>Running Markowitz optimization...</p>
+                    </>
+                  ) : optimizationError ? (
+                    <>
+                      <div className="text-destructive">
+                        <X className="h-8 w-8" />
+                      </div>
+                      <p className="text-destructive text-center">
+                        Optimization failed: {optimizationError}
+                      </p>
+                      <p className="text-xs text-muted-foreground text-center">
+                        Showing equal-weight portfolio as fallback
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-muted-foreground">
+                        <Target className="h-8 w-8" />
+                      </div>
+                      <p>Enter stocks and select optimization method</p>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -477,11 +653,36 @@ const PortfolioOptimizer: React.FC = () => {
           </div>
 
           <div className="mt-8 p-6 bg-card/60 backdrop-blur-sm rounded-2xl border border-border">
-            <p className="text-muted-foreground">
-              <strong className="text-foreground">Note:</strong> This optimization uses Mean-Variance Theory to maximize returns for given risk levels. 
-              Results are based on historical data and should not be considered as investment advice. 
-              The algorithm finds the optimal weights that minimize portfolio volatility for a target return level.
-            </p>
+            <div className="space-y-3">
+              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Markowitz Mean-Variance Optimization
+              </h3>
+              <div className="grid md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <strong className="text-foreground">Maximum Sharpe Ratio:</strong>
+                  <p className="text-muted-foreground mt-1">
+                    Finds the portfolio with the highest risk-adjusted return using gradient ascent optimization.
+                  </p>
+                </div>
+                <div>
+                  <strong className="text-foreground">Minimum Variance:</strong>
+                  <p className="text-muted-foreground mt-1">
+                    Uses analytical solution with matrix inversion to find the lowest-risk portfolio.
+                  </p>
+                </div>
+                <div>
+                  <strong className="text-foreground">Target Return:</strong>
+                  <p className="text-muted-foreground mt-1">
+                    Optimizes for a specific return level while minimizing portfolio risk.
+                  </p>
+                </div>
+              </div>
+              <p className="text-muted-foreground text-xs">
+                <strong className="text-foreground">Note:</strong> This implementation uses real Markowitz Mean-Variance Theory with historical data analysis, 
+                covariance matrix calculations, and mathematical optimization algorithms. Results are for educational purposes and should not be considered as investment advice.
+              </p>
+            </div>
           </div>
         </div>
       </div>
