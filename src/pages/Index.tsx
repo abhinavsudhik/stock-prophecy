@@ -6,7 +6,6 @@ import { ChainAllocation } from "@/components/ChainAllocation";
 import { TokenList } from "@/components/TokenList";
 import { CommunitySection } from "@/components/CommunitySection";
 import { SafariNotification } from "@/components/SafariNotification";
-import { APIDebugger } from "@/components/APIDebugger";
 import { PredictionData } from "@/services/geminiService";
 import { logSafariDebugInfo, testAPIConnectivity } from "@/utils/safariDebug";
 import { isSafari } from "@/utils/fetchPolyfill";
@@ -70,7 +69,6 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-gradient-bg">
       <SafariNotification />
-      <APIDebugger />
       <div className="flex">
         <Sidebar />
         <main className="flex-1 ml-64">
