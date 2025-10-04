@@ -14,20 +14,38 @@ export const Sidebar = () => {
   useEffect(() => {
     async function fetchStocks() {
       try {
-        // Use only valid, active symbols
-        setStocks([
+        const response = await fetch('http://localhost:4000/api/stocks');
+        const stockData = await response.json();
+        setStocks(stockData);
+        
+        // Automatically select the first stock
+        if (stockData.length > 0) {
+          setTimeout(() => {
+            setActiveIndex(0);
+            window.dispatchEvent(new CustomEvent("stock-select", { detail: stockData[0] }));
+          }, 100);
+        }
+      } catch (err) {
+        console.error('Error fetching stocks:', err);
+        // Fallback to hardcoded stocks if API fails
+        const fallbackStocks = [
           "Apple Inc. (AAPL)",
-          "Microsoft Corp. (MSFT)",
-          "Amazon.com Inc. (AMZN)",
+          "Microsoft Corporation (MSFT)",
+          "Amazon.com, Inc. (AMZN)",
           "Alphabet Inc. (GOOGL)",
-          "Meta Platforms Inc. (META)",
-          "NVIDIA Corp. (NVDA)",
-          "Tesla Inc. (TSLA)",
+          "Meta Platforms, Inc. (META)",
+          "NVIDIA Corporation (NVDA)",
+          "Tesla, Inc. (TSLA)",
           "JPMorgan Chase & Co. (JPM)",
           "Johnson & Johnson (JNJ)"
-        ]);
-      } catch (err) {
-        setStocks(["Error loading stocks"]);
+        ];
+        setStocks(fallbackStocks);
+        
+        // Automatically select the first stock
+        setTimeout(() => {
+          setActiveIndex(0);
+          window.dispatchEvent(new CustomEvent("stock-select", { detail: fallbackStocks[0] }));
+        }, 100);
       }
     }
     fetchStocks();
