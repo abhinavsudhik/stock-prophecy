@@ -1,4 +1,5 @@
-import { safeFetch, isSafari, logBrowserInfo } from '../utils/fetchPolyfill';
+import { safeFetch, isSafari } from '../utils/fetchPolyfill';
+import { logSafariDebugInfo } from '../utils/safariDebug';
 
 interface StockQuote {
   date: Date;
@@ -27,7 +28,7 @@ export class StockDataService {
     
     // Log browser info for debugging
     if (isSafari()) {
-      logBrowserInfo();
+      logSafariDebugInfo();
     }
     
     // Check cache first
