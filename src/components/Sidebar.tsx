@@ -7,7 +7,7 @@ const navigation = [
 ];
 
 export const Sidebar = () => {
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [activeStock, setActiveStock] = useState<string | null>(null);
   const [stocks, setStocks] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -18,13 +18,7 @@ export const Sidebar = () => {
         const stockData = await response.json();
         setStocks(stockData);
         
-        // Automatically select the first stock
-        if (stockData.length > 0) {
-          setTimeout(() => {
-            setActiveIndex(0);
-            window.dispatchEvent(new CustomEvent("stock-select", { detail: stockData[0] }));
-          }, 100);
-        }
+
       } catch (err) {
         console.error('Error fetching stocks:', err);
         // Fallback to hardcoded stocks if API fails
@@ -40,12 +34,7 @@ export const Sidebar = () => {
           "Johnson & Johnson (JNJ)"
         ];
         setStocks(fallbackStocks);
-        
-        // Automatically select the first stock
-        setTimeout(() => {
-          setActiveIndex(0);
-          window.dispatchEvent(new CustomEvent("stock-select", { detail: fallbackStocks[0] }));
-        }, 100);
+
       }
     }
     fetchStocks();
@@ -103,12 +92,12 @@ export const Sidebar = () => {
             key={name}
             className={cn(
               "w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-left transition-smooth",
-              activeIndex !== null && idx === activeIndex
+              activeStock === name
                 ? "bg-gradient-crypto text-primary-foreground shadow-crypto"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted"
             )}
             onClick={() => {
-              setActiveIndex(idx);
+              setActiveStock(name);
               window.dispatchEvent(new CustomEvent("stock-select", { detail: name }));
             }}
           >
