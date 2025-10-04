@@ -104,7 +104,7 @@ export const PortfolioChart: React.FC<{
       onPredictionChange(null);
     }
     
-    fetch(`http://localhost:4000/api/stock-data?symbol=${selectedStock}&period=${period}`)
+    fetch(`/api/stock-data?symbol=${selectedStock}&period=${period}`)
       .then((res) => res.json())
       .then((data) => {
         setChartData(data);

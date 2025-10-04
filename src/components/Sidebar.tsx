@@ -14,7 +14,7 @@ export const Sidebar = () => {
   useEffect(() => {
     async function fetchStocks() {
       try {
-        const response = await fetch('http://localhost:4000/api/stocks');
+        const response = await fetch('/api/stocks');
         const stockData = await response.json();
         setStocks(stockData);
         
