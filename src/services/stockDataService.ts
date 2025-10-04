@@ -1,3 +1,5 @@
+import { safeFetch, isSafari, logBrowserInfo } from '../utils/fetchPolyfill';
+
 interface StockQuote {
   date: Date;
   close: number;
@@ -23,6 +25,11 @@ export class StockDataService {
     const cacheKey = `${symbol}_${period}`;
     const now = Date.now();
     
+    // Log browser info for debugging
+    if (isSafari()) {
+      logBrowserInfo();
+    }
+    
     // Check cache first
     const cached = dataCache.get(cacheKey);
     if (cached && (now - cached.timestamp) < CACHE_DURATION) {
@@ -32,13 +39,29 @@ export class StockDataService {
 
     try {
       console.log(`Fetching fresh data for ${symbol} from Yahoo Finance API...`);
-      const response = await fetch(`${this.baseUrl}?symbol=${symbol}&period=${period}`);
       
-      if (!response.ok) {
-        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+      // Use the enhanced fetch function with retry for Safari compatibility
+      let response: Response;
+      let retryCount = 0;
+      const maxRetries = isSafari() ? 3 : 1;
+      
+      while (retryCount < maxRetries) {
+        try {
+          response = await safeFetch(`${this.baseUrl}?symbol=${symbol}&period=${period}`);
+          break; // Success, exit retry loop
+        } catch (error) {
+          retryCount++;
+          if (retryCount >= maxRetries) {
+            throw error; // Max retries reached, throw the error
+          }
+          
+          console.log(`Retry ${retryCount}/${maxRetries} for ${symbol}...`);
+          // Wait before retry (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+        }
       }
       
-      const data: StockQuote[] = await response.json();
+      const data: StockQuote[] = await response!.json();
       
       // Check if we got valid data
       if (!data || !Array.isArray(data) || data.length === 0) {

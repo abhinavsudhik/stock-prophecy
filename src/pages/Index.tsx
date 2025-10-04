@@ -5,7 +5,10 @@ import { PortfolioChart } from "@/components/PortfolioChart";
 import { ChainAllocation } from "@/components/ChainAllocation";
 import { TokenList } from "@/components/TokenList";
 import { CommunitySection } from "@/components/CommunitySection";
+import { SafariNotification } from "@/components/SafariNotification";
 import { PredictionData } from "@/services/geminiService";
+import { logSafariDebugInfo, testAPIConnectivity } from "@/utils/safariDebug";
+import { isSafari } from "@/utils/fetchPolyfill";
 
 import React, { useEffect, useState } from "react";
 
@@ -44,11 +47,28 @@ const Index = () => {
       }
     };
     window.addEventListener("stock-select", handler);
+    
+    // Safari debugging - only run on Safari
+    if (isSafari()) {
+      console.log('🦁 Safari detected - running compatibility checks...');
+      logSafariDebugInfo();
+      
+      // Test API connectivity on Safari
+      testAPIConnectivity(window.location.origin).then(result => {
+        if (result.success) {
+          console.log('✅ API connectivity test passed:', result);
+        } else {
+          console.error('❌ API connectivity test failed:', result);
+        }
+      });
+    }
+    
     return () => window.removeEventListener("stock-select", handler);
   }, []);
 
   return (
     <div className="min-h-screen bg-gradient-bg">
+      <SafariNotification />
       <div className="flex">
         <Sidebar />
         <main className="flex-1 ml-64">

@@ -3,7 +3,25 @@ import yahooFinance from 'yahoo-finance2';
 import cors from 'cors';
 
 const app = express();
-app.use(cors());
+
+// Enhanced CORS configuration for Safari compatibility
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  optionsSuccessStatus: 200,
+  maxAge: 86400 // 24 hours
+}));
+
+// Additional headers for Safari compatibility
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  next();
+});
+
 const PORT = 4000;
 
 // S&P 500 symbols list (static for demo, can be replaced with dynamic fetch)
