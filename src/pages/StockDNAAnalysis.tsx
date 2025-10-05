@@ -614,6 +614,8 @@ const StockDNAAnalysis = () => {
           </div>
         )}
 
+
+
         {/* Analysis Summary */}
         {!loading && selectedStock && selectedStock !== "" && stockData.length > 0 && (
           <Card className="mt-8">

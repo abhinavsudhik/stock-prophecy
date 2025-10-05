@@ -16,6 +16,7 @@ interface PortfolioMetrics {
   expectedReturn: number;
   volatility: number;
   sharpeRatio: number;
+  sortinoRatio: number;
 }
 
 interface StockSuggestion {
@@ -32,7 +33,8 @@ const PortfolioOptimizer: React.FC = () => {
   const [portfolioMetrics, setPortfolioMetrics] = useState<PortfolioMetrics>({
     expectedReturn: 0,
     volatility: 0,
-    sharpeRatio: 0
+    sharpeRatio: 0,
+    sortinoRatio: 0
   });
 
   // New states for autocomplete functionality
@@ -41,10 +43,11 @@ const PortfolioOptimizer: React.FC = () => {
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
   const [currentInput, setCurrentInput] = useState<string>('');
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
-  const [optimizationMethod, setOptimizationMethod] = useState<'maxSharpe' | 'minVariance' | 'targetReturn'>('maxSharpe');
+  const [optimizationMethod, setOptimizationMethod] = useState<'maxSharpe' | 'maxSortino' | 'minVariance' | 'targetReturn'>('maxSharpe');
   const [targetReturn, setTargetReturn] = useState<number>(0.12); // 12% target return
   const [isDataLoading, setIsDataLoading] = useState<boolean>(false);
   const [optimizationError, setOptimizationError] = useState<string | null>(null);
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
@@ -101,10 +104,15 @@ const PortfolioOptimizer: React.FC = () => {
     const currentWord = words[words.length - 1].trim().toUpperCase();
     setCurrentInput(currentWord);
     
+    // Check for duplicates in existing words (excluding the current word being typed)
+    const existingWords = words.slice(0, -1).map(w => w.trim().toUpperCase()).filter(w => w.length > 0);
+    
     if (currentWord.length > 0) {
+      // Filter suggestions excluding already entered stocks
       const filtered = popularStocks.filter(stock => 
-        stock.symbol.startsWith(currentWord) || 
-        stock.name.toLowerCase().includes(currentWord.toLowerCase())
+        (stock.symbol.startsWith(currentWord) || 
+         stock.name.toLowerCase().includes(currentWord.toLowerCase())) &&
+        !existingWords.includes(stock.symbol) // Exclude already entered stocks
       );
       setFilteredSuggestions(filtered);
       setShowSuggestions(true);
@@ -223,6 +231,16 @@ const PortfolioOptimizer: React.FC = () => {
             covarianceMatrix
           });
           break;
+        case 'maxSortino':
+          // Convert historical data to the format needed for Sortino calculation
+          const historicalReturnsArray = symbols.map(symbol => historicalData[symbol] || []);
+          result = optimizer.optimizeMaxSortino({
+            symbols,
+            expectedReturns,
+            covarianceMatrix,
+            historicalReturns: historicalReturnsArray
+          });
+          break;
         case 'minVariance':
           result = optimizer.optimizeMinVariance({
             symbols,
@@ -265,7 +283,8 @@ const PortfolioOptimizer: React.FC = () => {
       setPortfolioMetrics({
         expectedReturn: result.expectedReturn,
         volatility: result.volatility,
-        sharpeRatio: result.sharpeRatio
+        sharpeRatio: result.sharpeRatio,
+        sortinoRatio: result.sortinoRatio
       });
       
       console.log('Portfolio optimization completed successfully');
@@ -286,7 +305,8 @@ const PortfolioOptimizer: React.FC = () => {
       setPortfolioMetrics({
         expectedReturn: 0.1,
         volatility: 0.15,
-        sharpeRatio: 0.53
+        sharpeRatio: 0.53,
+        sortinoRatio: 0.67
       });
     } finally {
       setIsOptimizing(false);
@@ -295,7 +315,26 @@ const PortfolioOptimizer: React.FC = () => {
   };
 
   const handleOptimize = () => {
-    const symbols = stockInput.split(',').map(s => s.trim().toUpperCase()).filter(s => s.length > 0);
+    const allSymbols = stockInput.split(',').map(s => s.trim().toUpperCase()).filter(s => s.length > 0);
+    
+    // Remove duplicates
+    const symbols = [...new Set(allSymbols)];
+    
+    // Check if duplicates were found
+    if (allSymbols.length > symbols.length) {
+      const duplicateCount = allSymbols.length - symbols.length;
+      const message = `Removed ${duplicateCount} duplicate stock${duplicateCount > 1 ? 's' : ''} from portfolio`;
+      setDuplicateWarning(message);
+      
+      // Update the input field to remove duplicates
+      setStockInput(symbols.join(', '));
+      
+      // Clear warning after 3 seconds
+      setTimeout(() => setDuplicateWarning(null), 3000);
+    } else {
+      setDuplicateWarning(null);
+    }
+    
     if (symbols.length > 0) {
       optimizePortfolio(symbols);
     }
@@ -338,7 +377,7 @@ const PortfolioOptimizer: React.FC = () => {
             <label className="block text-sm font-medium text-muted-foreground mb-3">
               Optimization Method
             </label>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <button
                 onClick={() => setOptimizationMethod('maxSharpe')}
                 className={`p-4 rounded-lg border transition-smooth text-left ${
@@ -353,6 +392,23 @@ const PortfolioOptimizer: React.FC = () => {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Maximize risk-adjusted returns (return per unit of risk)
+                </p>
+              </button>
+
+              <button
+                onClick={() => setOptimizationMethod('maxSortino')}
+                className={`p-4 rounded-lg border transition-smooth text-left ${
+                  optimizationMethod === 'maxSortino'
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border bg-card/60 text-foreground hover:bg-card'
+                }`}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <TrendingUp className="h-5 w-5" />
+                  <span className="font-semibold">Maximum Sortino Ratio</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Maximize downside risk-adjusted returns (focuses on negative volatility)
                 </p>
               </button>
               
@@ -415,6 +471,42 @@ const PortfolioOptimizer: React.FC = () => {
             <label className="block text-sm font-medium text-muted-foreground mb-2">
               Stock Symbols (comma-separated)
             </label>
+            
+            {/* Display current stocks as pills */}
+            {stockInput.trim() && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {stockInput.split(',').map(s => s.trim().toUpperCase()).filter(s => s.length > 0).map((symbol, index, arr) => {
+                  const isDuplicate = arr.indexOf(symbol) !== index;
+                  return (
+                    <span
+                      key={`${symbol}-${index}`}
+                      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                        isDuplicate 
+                          ? 'bg-destructive/20 text-destructive border border-destructive/30' 
+                          : 'bg-primary/10 text-primary border border-primary/20'
+                      }`}
+                    >
+                      {symbol}
+                      {isDuplicate && (
+                        <span className="ml-1 text-xs">⚠️</span>
+                      )}
+                      <button
+                        onClick={() => {
+                          const symbols = stockInput.split(',').map(s => s.trim()).filter(s => s.length > 0);
+                          symbols.splice(index, 1);
+                          setStockInput(symbols.join(', '));
+                        }}
+                        className="ml-2 hover:text-destructive transition-colors"
+                        aria-label={`Remove ${symbol}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+            
             <div className="relative">
               <div className="flex gap-3">
                 <div className="flex-1 relative">
@@ -466,6 +558,15 @@ const PortfolioOptimizer: React.FC = () => {
                     </div>
                   )}
                 </div>
+                
+                {/* Duplicate Warning Message */}
+                {duplicateWarning && (
+                  <div className="mb-4 p-3 bg-warning/10 border border-warning/20 rounded-lg flex items-center gap-2">
+                    <span className="text-warning text-sm">⚠️</span>
+                    <span className="text-warning text-sm font-medium">{duplicateWarning}</span>
+                  </div>
+                )}
+                
                 <button
                   onClick={handleOptimize}
                   disabled={isOptimizing || isDataLoading}
@@ -481,7 +582,7 @@ const PortfolioOptimizer: React.FC = () => {
               
               {/* Helper text */}
               <p className="text-xs text-muted-foreground mt-2">
-                💡 Start typing a stock symbol or company name to see suggestions. Use ↑↓ arrow keys to navigate, Enter to select, or click on a suggestion to add it to your portfolio.
+                💡 Start typing a stock symbol or company name to see suggestions. Use ↑↓ arrow keys to navigate, Enter to select, or click on a suggestion to add it to your portfolio. Duplicate stocks are automatically prevented.
               </p>
             </div>
           </div>
@@ -633,6 +734,15 @@ const PortfolioOptimizer: React.FC = () => {
                 </div>
               </div>
 
+              <div className="bg-accent/10 border border-accent/20 rounded-2xl p-6 backdrop-blur-sm">
+                <div className="flex justify-between items-center">
+                  <span className="text-accent font-medium text-lg">Sortino Ratio</span>
+                  <span className="text-3xl font-bold text-accent">
+                    {portfolioMetrics.sortinoRatio.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
               {/* Individual Stock Breakdown */}
               {optimizedPortfolio.length > 0 && (
                 <div className="mt-8">
@@ -658,11 +768,17 @@ const PortfolioOptimizer: React.FC = () => {
                 <TrendingUp className="h-5 w-5" />
                 Markowitz Mean-Variance Optimization
               </h3>
-              <div className="grid md:grid-cols-3 gap-4 text-sm">
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                 <div>
                   <strong className="text-foreground">Maximum Sharpe Ratio:</strong>
                   <p className="text-muted-foreground mt-1">
                     Finds the portfolio with the highest risk-adjusted return using gradient ascent optimization.
+                  </p>
+                </div>
+                <div>
+                  <strong className="text-foreground">Maximum Sortino Ratio:</strong>
+                  <p className="text-muted-foreground mt-1">
+                    Optimizes for risk-adjusted returns considering only downside risk (negative volatility).
                   </p>
                 </div>
                 <div>

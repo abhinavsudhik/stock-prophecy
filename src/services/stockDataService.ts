@@ -275,3 +275,6 @@ export class StockDataService {
     dataCache.clear();
   }
 }
+
+// --- Streaming pattern worker factory -------------------------------------------------
+

@@ -49,6 +49,16 @@ Stock Prophecy is a comprehensive financial dashboard that provides:
 - Intelligent stock analysis
 - Automated trend detection
 
+### 📊 Portfolio Optimization
+
+- **Markowitz Mean-Variance Optimization**: Mathematical portfolio optimization using modern portfolio theory
+- **Maximum Sharpe Ratio**: Optimize for the best risk-adjusted returns
+- **Maximum Sortino Ratio**: Focus on downside risk-adjusted returns (NEW!)
+- **Minimum Variance**: Find the lowest-risk portfolio allocation
+- **Target Return**: Optimize for specific return objectives
+- **Real-time Metrics**: Display expected returns, volatility, Sharpe ratio, and Sortino ratio
+- **Interactive Optimization**: Easy-to-use interface for testing different optimization strategies
+
 ### 🎨 Modern UI/UX
 
 - Responsive design with shadcn/ui components
