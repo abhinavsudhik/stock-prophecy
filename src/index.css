@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Crypto Dashboard Design System */
+
+@layer base {
+  :root {
+    /* Crypto Dark Theme */
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+
+    /* Card System */
+    --card: 240 6% 10%;
+    --card-foreground: 0 0% 98%;
+    --card-glass: 240 6% 10% / 0.8;
+
+    /* Crypto Primary Colors */
+    --primary: 280 100% 70%;
+    --primary-foreground: 0 0% 98%;
+    --primary-glow: 280 100% 85%;
+
+    /* Crypto Accent Colors */
+    --accent: 320 100% 75%;
+    --accent-foreground: 0 0% 98%;
+    
+    --secondary: 200 100% 70%;
+    --secondary-foreground: 0 0% 98%;
+
+    /* Crypto Gradients */
+    --gradient-crypto: linear-gradient(135deg, hsl(280 100% 70%), hsl(320 100% 75%));
+    --gradient-chart: linear-gradient(135deg, hsl(280 100% 70%), hsl(200 100% 70%));
+    --gradient-bg: linear-gradient(135deg, hsl(240 10% 3.9%), hsl(260 8% 8%));
+
+    /* Status Colors */
+    --success: 142 76% 36%;
+    --success-foreground: 355 7% 97%;
+    
+    --warning: 48 96% 53%;
+    --warning-foreground: 26 83% 14%;
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* UI Elements */
+    --muted: 240 5% 15%;
+    --muted-foreground: 240 5% 65%;
+    
+    --border: 240 6% 20%;
+    --input: 240 6% 20%;
+    --ring: 280 100% 70%;
+
+    /* Predicted Trends */
+    --bitcoin: 38 92% 50%;
+    --ethereum: 240 100% 70%;
+    --shiba: 15 100% 60%;
+    --solana: 280 100% 70%;
+    --tether: 142 76% 36%;
+
+    /* Effects */
+    --glow-crypto: 0 0 40px hsl(var(--primary) / 0.3);
+    --shadow-crypto: 0 10px 30px -10px hsl(var(--primary) / 0.2);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    --radius: 1rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
